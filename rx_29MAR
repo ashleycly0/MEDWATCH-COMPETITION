@@ -1,0 +1,240 @@
+//libraries
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+#include <SPI.h>
+#include <Servo.h>
+#include <TFT.h>
+#include <Wire.h>
+
+//Pin Layout
+#define LED_Green 2
+#define LED_Red 3
+#define BUZZER 4
+#define Servo_PIN 5
+#define BUTTON 6 
+
+//RF radio
+#define radio_CE 9
+#define radio_CSN 8
+
+//TFT
+#define cs 10
+#define dc 7
+#define rst 6
+
+//Servo
+Servo myServo;
+
+//RF24
+RF24 radio(radio_CE, radio_CSN);  // CE, CSN
+const byte address[6] = "00001";
+
+//BUTTON
+int BUTTONstate = 0;
+
+//TFT
+TFT TFTscreen = TFT(cs, dc, rst);
+int redRandom;
+int greenRandom;
+int blueRandom;
+int dataRandom;
+int red;
+int xx = 85;
+int yy = 65;
+
+//Wire
+int data;
+int x;
+
+//LOGO
+static const unsigned char PROGMEM logo3_bmp[] =
+{ 0x01, 0xF0, 0x0F, 0x80, 0x06, 0x1C, 0x38, 0x60, 0x18, 0x06, 0x60, 0x18, 0x10, 0x01, 0x80, 0x08,
+0x20, 0x01, 0x80, 0x04, 0x40, 0x00, 0x00, 0x02, 0x40, 0x00, 0x00, 0x02, 0xC0, 0x00, 0x08, 0x03,
+0x80, 0x00, 0x08, 0x01, 0x80, 0x00, 0x18, 0x01, 0x80, 0x00, 0x1C, 0x01, 0x80, 0x00, 0x14, 0x00,
+0x80, 0x00, 0x14, 0x00, 0x80, 0x00, 0x14, 0x00, 0x40, 0x10, 0x12, 0x00, 0x40, 0x10, 0x12, 0x00,
+0x7E, 0x1F, 0x23, 0xFE, 0x03, 0x31, 0xA0, 0x04, 0x01, 0xA0, 0xA0, 0x0C, 0x00, 0xA0, 0xA0, 0x08,
+0x00, 0x60, 0xE0, 0x10, 0x00, 0x20, 0x60, 0x20, 0x06, 0x00, 0x40, 0x60, 0x03, 0x00, 0x40, 0xC0,
+0x01, 0x80, 0x01, 0x80, 0x00, 0xC0, 0x03, 0x00, 0x00, 0x60, 0x06, 0x00, 0x00, 0x30, 0x0C, 0x00,
+0x00, 0x08, 0x10, 0x00, 0x00, 0x06, 0x60, 0x00, 0x00, 0x03, 0xC0, 0x00, 0x00, 0x01, 0x80, 0x00  };
+
+void setup() {
+Serial.begin(9600); 
+
+//Wire
+Wire.begin(3); //I2C位址與連線設定，這裡設定為3號
+
+
+//Radio
+radio.begin();
+radio.openReadingPipe(0, address);
+radio.setPALevel(RF24_PA_MAX);
+radio.startListening();
+
+//Servo
+myServo.attach(5);
+myServo.write(0); 
+
+//Buzzer
+pinMode(BUZZER, OUTPUT);
+noTone(BUZZER);
+
+//BUTTON
+pinMode(BUTTON, INPUT);
+
+//LED
+pinMode(LED_Green, OUTPUT);
+pinMode(LED_Red, OUTPUT);
+
+//TFT
+TFTscreen.begin();
+TFTscreen.background(0, 0, 0);
+TFTscreen.setTextSize(2);
+
+//Serial print
+Serial.println("Program Start");
+Serial.println();
+}
+
+void loop() {
+  
+//Wire.onReceive(receiveEvent); //當收到I2C訊號時，啟動的動作
+
+digitalWrite(LED_Green, HIGH);  //Set Up LED
+
+RFsignal_1(); //Function 1
+
+//Serial.println("F2");
+BUTTON_signal();  //Function 2
+
+//Serial.println("F3");
+
+//tft_1();  //Function 3
+
+
+}
+
+// Function List //
+
+//--------------------------------------------- Function 1: RF24------------------------------------------
+
+void RFsignal_1(){
+  //Serial.println("Recieved RF Signal");
+  
+  if (radio.available()) {
+    Serial.println("available");
+    char text[32] = {0};
+    radio.read(&text, sizeof(text));
+    Serial.println(text);
+    digitalWrite(LED_Green, HIGH);
+
+ 
+//If recieve    
+     if ( String(text) == "A"){
+      Serial.println("Recieved RF Signal to open door");
+      myServo.write(90);
+      Serial.println("Servo turned to 90 deg");
+      tone(BUZZER, 1000);
+      digitalWrite(LED_Green, LOW);
+      digitalWrite(LED_Red, HIGH);
+      delay(1000);
+      Serial.flush();
+     }
+     else if( String(text) == "B") {
+        Serial.println("Recieved RF Signal to close door");
+        myServo.write(0);
+        Serial.println("Servo return to 0 deg");
+        noTone(BUZZER);
+        digitalWrite(LED_Green, HIGH);
+        digitalWrite(LED_Red, LOW);
+        Serial.flush();
+      }
+  }
+}
+
+//------------------------------------ END of Function 1 -------------------------------------------
+
+//------------------------------------ Function 2-------------------------------------------
+
+void BUTTON_signal(){
+BUTTONstate = digitalRead(BUTTON);
+//Serial.println(BUTTONstate);
+  if (BUTTONstate == LOW)
+  {
+    myServo.write(0);
+    digitalWrite(LED_Green, HIGH);
+    digitalWrite(LED_Red, LOW);
+    noTone(BUZZER);
+    delay(600000);
+  } 
+}
+
+//------------------------------------ END of Function 2-------------------------------------------
+
+//--------------------------------------------- Function 3: tft_1------------------------------------------
+
+void tft_1(){
+
+redRandom = random(0, 255);
+greenRandom = random (0, 255);
+blueRandom = random (0, 255);
+red = random(255);
+
+dataRandom = random (75, 85);
+
+
+
+char cstr[16];
+itoa(dataRandom, cstr, 10);
+
+TFTscreen.stroke(redRandom, greenRandom, blueRandom);
+
+TFTscreen.text("BPM", 41, 30);
+
+clearLED();
+
+TFTscreen.text(cstr, xx, yy);
+TFTscreen.text("BPM", 41, 30);
+
+    TFTscreen.drawBitmap(40, 57, logo3_bmp, 32, 32, red);       //Draw the first bmp picture (little heart)
+    TFTscreen.setTextSize(2); 
+
+delay(1000);
+
+}
+
+void clearLED(){
+  TFTscreen.background(0, 0, 0);
+}
+
+//------------------------------------ END of Function 3-------------------------------------------
+
+//--------------------------------------------- receiveEvent------------------------------------------
+
+void receiveEvent(int numBytes){
+  while(Wire.available()){ //判斷Wire.available()有沒有訊號
+
+   Serial.println("in the while loop");
+
+   data =int(Wire.read());
+   Serial.println(data); //透過Serial印出字串C的內容
+
+    
+    if (data == 49){
+      Serial.println("Recieved RFID Signal to open door");
+      myServo.write(90);
+      Serial.println("Servo turned to 90 deg");
+      Serial.flush();
+      }
+    else {
+      Serial.println("Recieved RFID Signal to close door");
+      myServo.write(0);
+      Serial.println("Servo return to 0 deg");
+      Serial.flush();
+    }
+  }
+}
+
+
+
+  
